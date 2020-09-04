@@ -2,6 +2,7 @@
 #include <vector>
 #include <map>
 #include <fstream>
+#include <memory>
 
 #include "TH1D.h"
 #include "TH2D.h"
@@ -10,23 +11,21 @@
 
 using namespace std;
 
-TH2Poly* buildDetHist();
-
-void showLayoutFixed()
+class DetHist
 {
-  gStyle->SetOptStat(0);
-  gStyle->SetOptTitle(0);
+public:
+  DetHist();
+  //~DetHist();
+  void Fill(const int detId, const double w=1.0);
+  void Draw(TString opt) {hDet_->Draw(opt);};
+  int GetRegion(const double z) { return z < -2300 ? -1 : z > 2300 ? +1 : 0; }
 
-  const double hmin = -8500, hmax = 8500, wmin = -8500, wmax = 8500;
-  TCanvas* c = new TCanvas("c", "c", 700, 700*(hmax-hmin)/(wmax-wmin));
-  TH2D* hFrame = new TH2D("hFrame", "", 100, wmin, wmax, 100, hmin, hmax);
-  hFrame->Draw();
+private:
+  std::unique_ptr<TH2Poly> hDet_;
+  
+};
 
-  TH2Poly* hDet = buildDetHist();
-  hDet->Draw("same");
-}
-
-TH2Poly* buildDetHist()
+DetHist::DetHist()
 {
   const std::vector<double> dSide = {
      7627.27,  7017.09,  6406.91,  5796.73,  5186.55,  4576.36,  3966.18, 
@@ -50,13 +49,13 @@ TH2Poly* buildDetHist()
   };
 
   // Shapes
-  TH2Poly* hDet = new TH2Poly();
+  hDet_.reset(new TH2Poly());
 
   // For side
   for ( unsigned i=0; i<dSide.size(); ++i ) {
     for ( unsigned j=0; j<zSide.size(); ++j ) {
       const double w = 220, h = 200;
-      hDet->AddBin(dSide[i]-w, zSide[j]-h, dSide[i]+w, zSide[j]+h);
+      hDet_->AddBin(dSide[i]-w, zSide[j]-h, dSide[i]+w, zSide[j]+h);
     }
   }
   // For upper and lower caps
@@ -78,11 +77,24 @@ TH2Poly* buildDetHist()
       }
 
       for ( unsigned k=0; k<ys.size(); ++k ) ys[k] += 5000;
-      hDet->AddBin(xs.size(), &xs[0], &ys[0]);
+      hDet_->AddBin(xs.size(), &xs[0], &ys[0]);
       for ( unsigned k=0; k<ys.size(); ++k ) ys[k] -= 10000;
-      hDet->AddBin(xs.size(), &xs[0], &ys[0]);
+      hDet_->AddBin(xs.size(), &xs[0], &ys[0]);
     }
   }
-
-  return hDet;
 }
+
+void showLayoutFixed()
+{
+  gStyle->SetOptStat(0);
+  gStyle->SetOptTitle(0);
+
+  DetHist* hDet = new DetHist;
+
+  const double hmin = -8500, hmax = 8500, wmin = -8500, wmax = 8500;
+  TCanvas* c = new TCanvas("c", "c", 700, 700*(hmax-hmin)/(wmax-wmin));
+  TH2D* hFrame = new TH2D("hFrame", "", 100, wmin, wmax, 100, hmin, hmax);
+  hFrame->Draw();
+  hDet->Draw("same");
+}
+
