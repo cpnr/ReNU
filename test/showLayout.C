@@ -10,7 +10,7 @@
 
 using namespace std;
 
-void displayDetector()
+void showLayout()
 {
   gStyle->SetOptStat(0);
   gStyle->SetOptTitle(0);
