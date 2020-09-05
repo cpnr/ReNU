@@ -14,7 +14,7 @@ using namespace std;
 class DetHist
 {
 public:
-  DetHist(const std::string name);
+  DetHist(const std::string name, const std::string title="");
   //~DetHist();
   void Fill(const int id, const double w=1.0);
   void SetContent(const int id, const double binContent);
@@ -32,7 +32,7 @@ private:
 
 };
 
-DetHist::DetHist(const std::string name)
+DetHist::DetHist(const std::string name, const std::string title)
 {
   // Read detector geometry file
   double rmax=0;
@@ -72,6 +72,7 @@ DetHist::DetHist(const std::string name)
   // Shapes
   hDet_.reset(new TH2Poly());
   hDet_->SetName(name.c_str());
+  hDet_->SetTitle(title.c_str());
 
   // For side
   for ( unsigned i=0; i<dSide.size(); ++i ) {
@@ -143,16 +144,16 @@ void DetHist::SetContent(const int id, const double content)
 void displayEvent()
 {
   gStyle->SetOptStat(0);
-  gStyle->SetOptTitle(0);
+  gStyle->SetOptTitle(1);
 
   const double hmin = -8500, hmax = 8500, wmin = -8500, wmax = 8500;
   TCanvas* c = new TCanvas("c", "c", 2*300, 2*300*(hmax-hmin)/(wmax-wmin));
   c->Divide(2,2);
 
-  DetHist* hDetTime1 = new DetHist("hDetTime1");
-  DetHist* hDetTime2 = new DetHist("hDetTime2");
-  DetHist* hDetCnt1 = new DetHist("hDetCnt1");
-  DetHist* hDetCnt2 = new DetHist("hDetCnt2");
+  DetHist* hDetTime1 = new DetHist("hDetTime1", "T(t<1000)");
+  DetHist* hDetTime2 = new DetHist("hDetTime2", "T(t>1000)");
+  DetHist* hDetCnt1 = new DetHist("hDetCnt1", "Counts(t<1000)");
+  DetHist* hDetCnt2 = new DetHist("hDetCnt2", "Counts(t>1000)");
   for ( int i=0; i<hDetTime1->GetN(); ++i ) {
     hDetTime1->Fill(i, i+1);
     hDetTime2->Fill(i, i+1);
@@ -170,7 +171,7 @@ void displayEvent()
   const int nEntries = tree->GetEntries();
 
   int b_nHits;
-  const int max_b_nHits = 1000;
+  const int max_b_nHits = 5000;
   int b_hitCounts[max_b_nHits], b_hitPMTIds[max_b_nHits];
   double b_hitTimes[max_b_nHits];
   tree->SetBranchAddress("photon_hits", &b_nHits);
