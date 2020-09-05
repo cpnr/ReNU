@@ -23,6 +23,7 @@ public:
   int GetRegionById(const int pmtId) const { return GetRegionByZ(pmtIdToPosMap_.at(pmtId)[2]); }
   int GetN() const { return pmtIdToPosMap_.size(); }
   void SetRange(const double zmin, const double zmax) { hDet_->SetMinimum(zmin); hDet_->SetMaximum(zmax); }
+  void Reset() { hDet_->Reset(""); }
 
 private:
   std::unique_ptr<TH2Poly> hDet_;
@@ -103,6 +104,8 @@ DetHist::DetHist(const std::string name)
       hDet_->AddBin(xs.size(), &xs[0], &ys[0]);
     }
   }
+
+  hDet_->SetMinimum(1e-9);
 }
 
 void DetHist::Fill(const int id, const double w=1.0)
@@ -137,7 +140,7 @@ void DetHist::SetContent(const int id, const double content)
   }
 }
 
-void showLayoutFixed()
+void displayEvent()
 {
   gStyle->SetOptStat(0);
   gStyle->SetOptTitle(0);
@@ -145,14 +148,22 @@ void showLayoutFixed()
   const double hmin = -8500, hmax = 8500, wmin = -8500, wmax = 8500;
   TCanvas* c = new TCanvas("c", "c", 2*300, 2*300*(hmax-hmin)/(wmax-wmin));
   c->Divide(2,2);
-  //TH2D* hFrame = new TH2D("hFrame", "", 100, wmin, wmax, 100, hmin, hmax);
-  //hFrame->Draw();
 
   DetHist* hDetTime1 = new DetHist("hDetTime1");
   DetHist* hDetTime2 = new DetHist("hDetTime2");
   DetHist* hDetCnt1 = new DetHist("hDetCnt1");
   DetHist* hDetCnt2 = new DetHist("hDetCnt2");
-  //for ( int i=0; i<hDet->GetN(); ++i ) hDet->Fill(i, i+1);
+  for ( int i=0; i<hDetTime1->GetN(); ++i ) {
+    hDetTime1->Fill(i, i+1);
+    hDetTime2->Fill(i, i+1);
+    hDetCnt1->Fill(i, i+1);
+    hDetCnt2->Fill(i, i+1);
+  }
+  c->cd(1); hDetTime1->Draw("COLZ");
+  c->cd(2); hDetTime2->Draw("COLZ");
+  c->cd(3); hDetCnt1->Draw("COLZ");
+  c->cd(4); hDetCnt2->Draw("COLZ");
+  c->Update();
 
   TFile* f = TFile::Open("../data/IBD_MC_for_ML.root");
   TTree* tree = (TTree*)f->Get("event");
@@ -167,6 +178,11 @@ void showLayoutFixed()
   tree->SetBranchAddress("hit_time", &b_hitTimes);
   tree->SetBranchAddress("hit_pmt", &b_hitPMTIds);
   while ( true ) {
+    hDetTime1->Reset();
+    hDetTime2->Reset();
+    hDetCnt1->Reset();
+    hDetCnt2->Reset();
+
     int iEvent;
     cout << "Type event number to display ([0-" << (nEntries-1) << "]:";
     cin >> iEvent;
@@ -177,7 +193,6 @@ void showLayoutFixed()
     double t1Min = 1e9, t1Max = -1e9;
     double t2Min = 1e9, t2Max = -1e9;
     for ( int i=0; i<b_nHits; ++i ) {
-      //cout << b_hitTimes[i] << ' ';
       const int id = b_hitPMTIds[i];
       const double t = b_hitTimes[i];
       const int cnt = b_hitCounts[i];
@@ -197,15 +212,10 @@ void showLayoutFixed()
     hDetTime1->SetRange(t1Min, t1Max);
     hDetTime2->SetRange(t2Min, t2Max);
 
-    c->cd(1);
-    hDetTime1->Draw("COLZ");
-    c->cd(2);
-    hDetTime2->Draw("COLZ");
-    c->cd(3);
-    hDetCnt1->Draw("COLZ");
-    c->cd(4);
-    hDetCnt2->Draw("COLZ");
-
+    c->cd(1); hDetTime1->Draw("COLZ");
+    c->cd(2); hDetTime2->Draw("COLZ");
+    c->cd(3); hDetCnt1->Draw("COLZ");
+    c->cd(4); hDetCnt2->Draw("COLZ");
     c->Update();
   }
 }
