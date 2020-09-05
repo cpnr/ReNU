@@ -17,10 +17,12 @@ public:
   DetHist(const std::string name);
   //~DetHist();
   void Fill(const int id, const double w=1.0);
+  void SetContent(const int id, const double binContent);
   void Draw(TString opt) { hDet_->Draw(opt); }
   int GetRegionByZ(const double z) const { return z < -2300 ? -1 : z > 2300 ? +1 : 0; }
   int GetRegionById(const int pmtId) const { return GetRegionByZ(pmtIdToPosMap_.at(pmtId)[2]); }
   int GetN() const { return pmtIdToPosMap_.size(); }
+  void SetRange(const double zmin, const double zmax) { hDet_->SetMinimum(zmin); hDet_->SetMaximum(zmax); }
 
 private:
   std::unique_ptr<TH2Poly> hDet_;
@@ -116,7 +118,23 @@ void DetHist::Fill(const int id, const double w=1.0)
     const double shift = yShiftOnCanvas_*GetRegionById(id);
     hDet_->Fill(pos[0], pos[1]+shift, w);
   }
+}
 
+void DetHist::SetContent(const int id, const double content)
+{
+  const int region = GetRegionById(id);
+  const auto pos = pmtIdToPosMap_[id];
+  if ( region == 0 ) {
+    const double r = std::hypot(pos[0], pos[1]);
+    const double phi = std::atan2(pos[1], pos[0]);
+    const int b = hDet_->FindBin(r*phi, pos[2]);
+    hDet_->SetBinContent(b, content);
+  }
+  else {
+    const double shift = yShiftOnCanvas_*GetRegionById(id);
+    const int b = hDet_->FindBin(pos[0], pos[1]+shift);
+    hDet_->SetBinContent(b, content);
+  }
 }
 
 void showLayoutFixed()
@@ -124,14 +142,71 @@ void showLayoutFixed()
   gStyle->SetOptStat(0);
   gStyle->SetOptTitle(0);
 
-  DetHist* hDet = new DetHist("h");
-  for ( int i=0; i<hDet->GetN(); ++i ) hDet->Fill(i, i+1);
-
   const double hmin = -8500, hmax = 8500, wmin = -8500, wmax = 8500;
-  TCanvas* c = new TCanvas("c", "c", 700, 700*(hmax-hmin)/(wmax-wmin));
-  TH2D* hFrame = new TH2D("hFrame", "", 100, wmin, wmax, 100, hmin, hmax);
-  hFrame->Draw();
-  hDet->Draw("sameCOLZ");
+  TCanvas* c = new TCanvas("c", "c", 2*300, 2*300*(hmax-hmin)/(wmax-wmin));
+  c->Divide(2,2);
+  //TH2D* hFrame = new TH2D("hFrame", "", 100, wmin, wmax, 100, hmin, hmax);
+  //hFrame->Draw();
 
+  DetHist* hDetTime1 = new DetHist("hDetTime1");
+  DetHist* hDetTime2 = new DetHist("hDetTime2");
+  DetHist* hDetCnt1 = new DetHist("hDetCnt1");
+  DetHist* hDetCnt2 = new DetHist("hDetCnt2");
+  //for ( int i=0; i<hDet->GetN(); ++i ) hDet->Fill(i, i+1);
+
+  TFile* f = TFile::Open("../data/IBD_MC_for_ML.root");
+  TTree* tree = (TTree*)f->Get("event");
+  const int nEntries = tree->GetEntries();
+
+  int b_nHits;
+  const int max_b_nHits = 1000;
+  int b_hitCounts[max_b_nHits], b_hitPMTIds[max_b_nHits];
+  double b_hitTimes[max_b_nHits];
+  tree->SetBranchAddress("photon_hits", &b_nHits);
+  tree->SetBranchAddress("hit_count", &b_hitCounts);
+  tree->SetBranchAddress("hit_time", &b_hitTimes);
+  tree->SetBranchAddress("hit_pmt", &b_hitPMTIds);
+  while ( true ) {
+    int iEvent;
+    cout << "Type event number to display ([0-" << (nEntries-1) << "]:";
+    cin >> iEvent;
+    if ( iEvent < 0 ) break;
+
+    tree->GetEntry(iEvent);
+    
+    double t1Min = 1e9, t1Max = -1e9;
+    double t2Min = 1e9, t2Max = -1e9;
+    for ( int i=0; i<b_nHits; ++i ) {
+      //cout << b_hitTimes[i] << ' ';
+      const int id = b_hitPMTIds[i];
+      const double t = b_hitTimes[i];
+      const int cnt = b_hitCounts[i];
+      if ( t < 1000 ) {
+        hDetTime1->SetContent(id, t);
+        t1Min = std::min(t1Min, t);
+        t1Max = std::max(t1Max, t);
+        hDetCnt1->Fill(id, cnt);
+      }
+      else {
+        hDetTime2->SetContent(id, t);
+        t2Min = std::min(t2Min, t);
+        t2Max = std::max(t2Max, t);
+        hDetCnt2->Fill(id, cnt);
+      }
+    }
+    hDetTime1->SetRange(t1Min, t1Max);
+    hDetTime2->SetRange(t2Min, t2Max);
+
+    c->cd(1);
+    hDetTime1->Draw("COLZ");
+    c->cd(2);
+    hDetTime2->Draw("COLZ");
+    c->cd(3);
+    hDetCnt1->Draw("COLZ");
+    c->cd(4);
+    hDetCnt2->Draw("COLZ");
+
+    c->Update();
+  }
 }
 
